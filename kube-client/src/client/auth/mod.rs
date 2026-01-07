@@ -1,7 +1,5 @@
 use std::{
-    path::{Path, PathBuf},
-    process::Command,
-    sync::Arc,
+    io::Read, path::{Path, PathBuf}, process::Command, sync::Arc
 };
 
 use chrono::{DateTime, Duration, Utc};
@@ -588,10 +586,18 @@ fn auth_exec(auth: &ExecConfig) -> Result<ExecCredential, Error> {
     let interactive = auth.interactive_mode != Some(ExecInteractiveMode::Never);
     if interactive {
         cmd.stdin(std::process::Stdio::inherit());
+        
+        // In interactive environments, the user might be prompted to go through 2FA by their
+        // auth tool of choice. These tools use `stderr` explicitly for user-facing messages,
+        // and stdout for the data to be processed afterward.
+        //
+        // A concrete example is kubelogin, as can be seen in:
+        // https://github.com/Azure/kubelogin
         cmd.stderr(std::process::Stdio::inherit());
     } else {
         cmd.stdin(std::process::Stdio::piped());
     }
+    cmd.stdout(std::process::Stdio::piped());
 
     let mut exec_credential_spec = ExecCredentialSpec {
         interactive: Some(interactive),
@@ -624,12 +630,18 @@ fn auth_exec(auth: &ExecConfig) -> Result<ExecCredential, Error> {
         cmd.creation_flags(CREATE_NO_WINDOW);
     }
 
-    let out = cmd.output().map_err(Error::AuthExecStart)?;
+    // Start running process in the background.;
+    let child = cmd.spawn().map_err(Error::AuthExecStart)?;
+
+    // Wait for program to finish execution.
+    // NOTE: stderr will be empty as it is inherited.
+    let out = child.wait_with_output().map_err(Error::AuthExecStart)?;
+
     if !out.status.success() {
         return Err(Error::AuthExecRun {
             cmd: format!("{cmd:?}"),
             status: out.status,
-            out,
+            out
         });
     }
     let creds = serde_json::from_slice(&out.stdout).map_err(Error::AuthExecParse)?;
