@@ -593,10 +593,10 @@ fn auth_exec(auth: &ExecConfig) -> Result<ExecCredential, Error> {
         //
         // A concrete example is kubelogin, as can be seen in:
         // https://github.com/Azure/kubelogin
-        cmd.stderr(std::process::Stdio::inherit());
     } else {
         cmd.stdin(std::process::Stdio::piped());
     }
+    cmd.stderr(std::process::Stdio::inherit());
     cmd.stdout(std::process::Stdio::piped());
 
     let mut exec_credential_spec = ExecCredentialSpec {
@@ -626,8 +626,8 @@ fn auth_exec(auth: &ExecConfig) -> Result<ExecCredential, Error> {
 
     #[cfg(target_os = "windows")]
     {
-        const CREATE_NO_WINDOW: u32 = 0x08000000;
-        cmd.creation_flags(CREATE_NO_WINDOW);
+        //const CREATE_NO_WINDOW: u32 = 0x08000000;
+        //cmd.creation_flags(CREATE_NO_WINDOW);
     }
 
     // Start running process in the background.;
